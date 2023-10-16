@@ -11,12 +11,10 @@ import (
 )
 
 func main() {
-	// Create a new health instance
+	// Create a new health instance.
 	h := health.New()
 
-	// Create a kafka check. Skip the first two consumer iterations to give the
-	// rebalancer process time enough to assign the consumer a partition, avoiding
-	// errors at startup (this is not mandatory, but a polite way to start).
+	// Create a kafka check skipping the first three consumer timeouts if any.
 	kafkaCheck, err := kafka.NewKafka(kafka.KafkaConfig{
 		BootstrapServers:     "localhost:19092",
 		SkipConsumerTimeouts: 3,
@@ -26,7 +24,7 @@ func main() {
 		panic(err)
 	}
 
-	// Add the checks to the health instance
+	// Add the checks to the health instance.
 	h.AddChecks([]*health.Config{
 		{
 			Name:     "kafka-check",
@@ -36,14 +34,14 @@ func main() {
 		},
 	})
 
-	//  Start the healthcheck process
+	//  Start the healthcheck process.
 	if err := h.Start(); err != nil {
 		log.Fatalf("Unable to start healthcheck: %v", err)
 	}
 
 	log.Println("Server listening on :8080")
 
-	// Define a healthcheck endpoint and use the built-in JSON handler
+	// Define a healthcheck endpoint and use the built-in JSON handler.
 	http.HandleFunc("/healthcheck", handlers.NewJSONHandlerFunc(h, nil))
 	http.ListenAndServe(":8080", nil)
 }
