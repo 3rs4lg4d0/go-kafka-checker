@@ -117,8 +117,8 @@ func TestStatus(t *testing.T) {
 		skip := 2
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
-			BootstrapServers:       bootStrapServers[0],
-			SkipConsumerIterations: skip,
+			BootstrapServers:     bootStrapServers[0],
+			SkipConsumerTimeouts: skip,
 		})
 		defer kafkaCheck.consumer.Close()
 		defer kafkaCheck.producer.Close()
@@ -134,7 +134,7 @@ func TestStatus(t *testing.T) {
 				assert.NoError(t, err)
 				fmt.Printf("[OK] details=%v\n", details)
 				skip--
-				assert.Equal(t, map[string]string{"info": fmt.Sprintf("check skipped (%d remaining)", skip)}, details)
+				assert.Equal(t, map[string]string{"info": fmt.Sprintf("skipped check timeout (%d remaining)", skip)}, details)
 			}
 		}
 	})

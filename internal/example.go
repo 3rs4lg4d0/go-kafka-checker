@@ -18,8 +18,8 @@ func main() {
 	// rebalancer process time enough to assign the consumer a partition, avoiding
 	// errors at startup (this is not mandatory, but a polite way to start).
 	kafkaCheck, err := kafka.NewKafka(kafka.KafkaConfig{
-		BootstrapServers:       "localhost:19092",
-		SkipConsumerIterations: 3,
+		BootstrapServers:     "localhost:19092",
+		SkipConsumerTimeouts: 3,
 	})
 
 	if err != nil {
