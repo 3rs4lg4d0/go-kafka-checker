@@ -40,6 +40,7 @@ type KafkaConfig struct {
 	SkipConsumerTimeouts int           // maximum number of check timeouts to skip at the beginning when consuming messages
 }
 
+// Kafka implements the "ICheckable" interface.
 type Kafka struct {
 	config   *KafkaConfig
 	producer *kafka.Producer

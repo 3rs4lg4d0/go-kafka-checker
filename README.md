@@ -1,4 +1,5 @@
 [![CI pipeline](https://github.com/3rs4lg4d0/go-kafka-checker/actions/workflows/ci.yaml/badge.svg)](https://github.com/3rs4lg4d0/go-kafka-checker/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/3rs4lg4d0/go-kafka-checker/graph/badge.svg?token=MR8UB78L5V)](https://codecov.io/gh/3rs4lg4d0/go-kafka-checker)
 [![Go Report Card](https://goreportcard.com/badge/github.com/3rs4lg4d0/go-kafka-checker)](https://goreportcard.com/report/github.com/3rs4lg4d0/go-kafka-checker)
 [![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
