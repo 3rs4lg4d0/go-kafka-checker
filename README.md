@@ -37,11 +37,11 @@ You can configure the checker using the `KafkaConfig` struct.
 
 ```go
 type KafkaConfig struct {
-	BootstrapServers       string
-	Topic                  string
-	PollTimeout            time.Duration
-	CheckTimeout           time.Duration
-	SkipConsumerIterations int
+    BootstrapServers     string
+    Topic                string
+    PollTimeout          time.Duration
+    CheckTimeout         time.Duration
+    SkipConsumerTimeouts int
 }
 ```
 
