@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -112,20 +113,22 @@ func TestStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Check that the first 2 steps are skipped", func(t *testing.T) {
+	t.Run("Check that at least 1 check timeout is skipped", func(t *testing.T) {
 		ctx := context.Background()
-		skip := 2
+		iterations := 2
+		skipped := 0
+
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
-			BootstrapServers:       bootStrapServers[0],
-			SkipConsumerIterations: skip,
+			BootstrapServers:     bootStrapServers[0],
+			SkipConsumerTimeouts: iterations,
 		})
 		defer kafkaCheck.consumer.Close()
 		defer kafkaCheck.producer.Close()
 
 		done := time.After(120 * time.Second)
 		ticker := time.NewTicker(5 * time.Second)
-		for skip > 0 {
+		for iterations > 0 {
 			select {
 			case <-done:
 				t.Fatal("The test couldn't complete in two minutes")
@@ -133,9 +136,12 @@ func TestStatus(t *testing.T) {
 				details, err := kafkaCheck.Status()
 				assert.NoError(t, err)
 				fmt.Printf("[OK] details=%v\n", details)
-				skip--
-				assert.Equal(t, map[string]string{"info": fmt.Sprintf("check skipped (%d remaining)", skip)}, details)
+				iterations--
+				if reflect.DeepEqual(map[string]string{"info": fmt.Sprintf("skipped check timeout (%d remaining)", iterations)}, details) {
+					skipped++
+				}
 			}
 		}
+		assert.True(t, skipped > 0)
 	})
 }

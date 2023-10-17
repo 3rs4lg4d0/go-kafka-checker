@@ -14,20 +14,30 @@ import (
 )
 
 const (
-	consumerGroupPrefix           string        = "health-check-"
-	defaultTopic                  string        = "health-checks"
-	defaultPollTimeout            time.Duration = time.Millisecond * 200
-	defaultCheckTimeout           time.Duration = time.Second
-	defaultSkipConsumerIterations int           = 0
+	consumerGroupPrefix         string        = "health-check-"
+	defaultTopic                string        = "health-checks"
+	defaultPollTimeout          time.Duration = time.Millisecond * 200
+	defaultCheckTimeout         time.Duration = time.Second
+	defaultSkipConsumerTimeouts int           = 0
 )
+
+// checkTimeoutError is a custom error type used to represent a timeout that
+// occurs while executing the status check (while a message is being sent or consumed).
+type checkTimeoutError struct {
+	message string
+}
+
+func (e *checkTimeoutError) Error() string {
+	return e.message
+}
 
 // KafkaConfig is used for configuring the go-kafka check.
 type KafkaConfig struct {
-	BootstrapServers       string        // coma separated list of kafka brokers
-	Topic                  string        // topic to connect to (make sure it exists)
-	PollTimeout            time.Duration // The time spent fetching the data from the topic
-	CheckTimeout           time.Duration // The maximum time to wait for the check to complete
-	SkipConsumerIterations int           // Number of checks to skip at the beginning
+	BootstrapServers     string        // coma separated list of kafka brokers
+	Topic                string        // topic to connect to (make sure it exists)
+	PollTimeout          time.Duration // time spent fetching the data from the topic
+	CheckTimeout         time.Duration // maximum time to wait for the check to complete
+	SkipConsumerTimeouts int           // maximum number of check timeouts to skip at the beginning when consuming messages
 }
 
 type Kafka struct {
@@ -96,8 +106,8 @@ func validateKafkaConfig(cfg *KafkaConfig) error {
 		cfg.CheckTimeout = defaultCheckTimeout
 	}
 
-	if cfg.SkipConsumerIterations <= 0 {
-		cfg.SkipConsumerIterations = defaultSkipConsumerIterations
+	if cfg.SkipConsumerTimeouts <= 0 {
+		cfg.SkipConsumerTimeouts = defaultSkipConsumerTimeouts
 	}
 
 	return nil
@@ -133,27 +143,27 @@ func (k *Kafka) Status() (interface{}, error) {
 	expectedMessage, err := k.sendMessage(ctx)
 	if err != nil {
 		// If the application starts with a producer error we don't want to skip
-		// next consumer iterations so we recover a healthy state as soon as posible.
-		if k.config.SkipConsumerIterations > 0 {
-			k.config.SkipConsumerIterations = 0
-		}
+		// next consumer iterations so we set the value to zero.
+		k.config.SkipConsumerTimeouts = 0
 		details["producer"] = err.Error()
 		return details, errors.New("error sending messages")
 	}
 
-	found, err := k.consumeMessage(ctx, expectedMessage)
-	// Report an error only when SkipIterations is zero.
-	if !found && k.config.SkipConsumerIterations == 0 {
-		details["consumer"] = err.Error()
-		return details, errors.New("error receiving messages")
+	err = k.consumeMessage(ctx, expectedMessage)
+	if err != nil {
+		_, isCheckTimeoutError := err.(*checkTimeoutError)
+		if isCheckTimeoutError && k.config.SkipConsumerTimeouts > 0 {
+			details["info"] = fmt.Sprintf("skipped check timeout (%d remaining)", k.config.SkipConsumerTimeouts-1)
+			k.config.SkipConsumerTimeouts--
+			return details, nil
+		} else {
+			details["consumer"] = err.Error()
+			return details, errors.New("error receiving messages")
+		}
 	}
 
-	if k.config.SkipConsumerIterations > 0 {
-		details["info"] = fmt.Sprintf("check skipped (%d remaining)", k.config.SkipConsumerIterations-1)
-		k.config.SkipConsumerIterations--
-		return details, nil
-	}
-
+	// Set the property to zero as soon as we complete a roundtrip successfully.
+	k.config.SkipConsumerTimeouts = 0
 	details["info"] = fmt.Sprintf("Check completed in %v", time.Since(checkStart))
 	return details, nil
 
@@ -178,7 +188,7 @@ func (k *Kafka) sendMessage(ctx context.Context) (msg string, deliveryErr error)
 		for {
 			select {
 			case <-ctx.Done():
-				deliveryErr = errors.New("check timeout while waiting for the message delivery report")
+				deliveryErr = &checkTimeoutError{message: "check timeout while waiting for the message delivery report"}
 				wg.Done()
 				return
 			case e := <-k.producer.Events():
@@ -197,14 +207,14 @@ func (k *Kafka) sendMessage(ctx context.Context) (msg string, deliveryErr error)
 }
 
 // consumeMessage starts a consuming loop to check for the expected message. It returns
-// a boolean to indicate whether the expected message was received and a possible error.
-func (k *Kafka) consumeMessage(ctx context.Context, expectedMessage string) (bool, error) {
+// nil to indicate whether the expected message was received or an error in other case.
+func (k *Kafka) consumeMessage(ctx context.Context, expectedMessage string) error {
 	for {
 		select {
 		// If the context deadline was already reached when producing this case
 		// will execute anyway at first place.
 		case <-ctx.Done():
-			return false, errors.New("check timeout while consuming messages")
+			return &checkTimeoutError{message: "check timeout while consuming messages"}
 		default:
 			ev := k.consumer.Poll(int(k.config.PollTimeout / time.Millisecond))
 			if ev == nil {
@@ -213,10 +223,10 @@ func (k *Kafka) consumeMessage(ctx context.Context, expectedMessage string) (boo
 			switch e := ev.(type) {
 			case *kafka.Message:
 				if expectedMessage == string(e.Value) {
-					return true, nil
+					return nil
 				}
 			case kafka.Error:
-				return false, e
+				return e
 			}
 		}
 	}
