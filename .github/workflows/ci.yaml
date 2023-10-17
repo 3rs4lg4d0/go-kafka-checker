@@ -23,15 +23,17 @@ jobs:
       with:
         go-version-file: go.mod
         cache-dependency-path: go.sum
-
-    - name: Generate sources
-      run: go generate -v ./...
     
     - name: Build all
       run: go build -v ./...
 
     - name: Test
-      run: go test -v -cover ./...
+      run: go test -v -race -covermode=atomic -coverprofile=coverage.out
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   dependabot:
     runs-on: ubuntu-latest
