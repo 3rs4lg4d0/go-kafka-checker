@@ -25,14 +25,16 @@ func main() {
 	}
 
 	// Add the checks to the health instance.
-	h.AddChecks([]*health.Config{
-		{
-			Name:     "kafka-check",
-			Checker:  kafkaCheck,
-			Interval: 5 * time.Second,
-			Fatal:    true,
-		},
+	err = h.AddCheck(&health.Config{
+		Name:     "kafka-check",
+		Checker:  kafkaCheck,
+		Interval: 5 * time.Second,
+		Fatal:    true,
 	})
+
+	if err != nil {
+		panic(err)
+	}
 
 	//  Start the healthcheck process.
 	if err := h.Start(); err != nil {
@@ -43,5 +45,9 @@ func main() {
 
 	// Define a healthcheck endpoint and use the built-in JSON handler.
 	http.HandleFunc("/healthcheck", handlers.NewJSONHandlerFunc(h, nil))
-	http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(":8080", nil)
+
+	if err != nil {
+		panic(err)
+	}
 }
