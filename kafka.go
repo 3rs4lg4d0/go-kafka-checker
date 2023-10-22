@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,12 @@ const (
 	defaultPollTimeout          time.Duration = time.Millisecond * 200
 	defaultCheckTimeout         time.Duration = time.Second
 	defaultSkipConsumerTimeouts int           = 0
+)
+
+const (
+	bootstrapServersKey string = "bootstrap.servers"
+	groupIdKey          string = "group.id"
+	autoOffsetResetKey  string = "auto.offset.reset"
 )
 
 // checkTimeoutError is a custom error type used to represent a timeout that
@@ -38,13 +45,18 @@ type hostnameProvider func() (string, error)
 // hnProvider is the default hostname provider.
 var hnProvider hostnameProvider = os.Hostname
 
+type ConsumerConfig map[string]any
+type ProducerConfig map[string]any
+
 // KafkaConfig is used for configuring the go-kafka check.
 type KafkaConfig struct {
-	BootstrapServers     string        // coma separated list of kafka brokers
-	Topic                string        // topic to connect to (make sure it exists)
-	PollTimeout          time.Duration // time spent fetching the data from the topic
-	CheckTimeout         time.Duration // maximum time to wait for the check to complete
-	SkipConsumerTimeouts int           // maximum number of check timeouts to skip at the beginning when consuming messages
+	BootstrapServers     string         // coma separated list of kafka brokers
+	Topic                string         // topic to connect to (make sure it exists)
+	PollTimeout          time.Duration  // time spent fetching the data from the topic
+	CheckTimeout         time.Duration  // maximum time to wait for the check to complete
+	SkipConsumerTimeouts int            // maximum number of check timeouts to skip at the beginning when consuming messages
+	ConsumerConfig       ConsumerConfig // consumer configuration (see https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md)
+	ProducerConfig       ProducerConfig // producer configuration (see https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md)
 }
 
 // Kafka implements the "ICheckable" interface.
@@ -63,19 +75,31 @@ func NewKafka(cfg KafkaConfig) (*Kafka, error) {
 		return nil, fmt.Errorf("invalid kafka config: %w", err)
 	}
 
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": cfg.BootstrapServers,
-		"group.id":          buildUniqueConsumerGroupId(),
-		"auto.offset.reset": "latest",
-	})
+	cc := kafka.ConfigMap{
+		bootstrapServersKey: cfg.BootstrapServers,
+		groupIdKey:          buildUniqueConsumerGroupId(),
+		autoOffsetResetKey:  "latest",
+	}
+	for key, value := range cfg.ConsumerConfig {
+		if key != bootstrapServersKey && key != groupIdKey && key != autoOffsetResetKey {
+			cc[key] = value
+		}
+	}
+	c, err := kafka.NewConsumer(&cc)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka consumer: %w", err)
 	}
 
-	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": cfg.BootstrapServers,
-	})
+	pc := kafka.ConfigMap{
+		bootstrapServersKey: cfg.BootstrapServers,
+	}
+	for key, value := range cfg.ProducerConfig {
+		if key != bootstrapServersKey {
+			pc[key] = value
+		}
+	}
+	p, err := kafka.NewProducer(&pc)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka producer: %w", err)
@@ -102,7 +126,7 @@ func validateKafkaConfig(cfg *KafkaConfig) error {
 		return errors.New("BootstrapServers property is mandatory")
 	}
 
-	if cfg.Topic == "" {
+	if strings.TrimSpace(cfg.Topic) == "" {
 		cfg.Topic = defaultTopic
 	}
 

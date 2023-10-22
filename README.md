@@ -43,6 +43,8 @@ type KafkaConfig struct {
     PollTimeout          time.Duration
     CheckTimeout         time.Duration
     SkipConsumerTimeouts int
+    ConsumerConfig       map[string]any
+    ProducerConfig       map[string]any
 }
 ```
 
@@ -53,6 +55,8 @@ type KafkaConfig struct {
 | PollTimeout | time.Duration | 200 ms | The maximum time spent fetching data from the topic. |
 | CheckTimeout | time.Duration | 1000 ms | The maximum time to wait for the check to complete. |
 | SkipConsumerTimeouts | int | 0 | Maximum number of check timeouts to skip at the beginning when consuming messages. |
+| ConsumerConfig | map[string]any | 0 | Consumer configuration (see https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md). |
+| ProducerConfig | map[string]any | 0 | Producer configuration (see https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md). |
 
 `SkipConsumerTimeouts` can be a useful property to avoid some unhealthy results because joining to a consumer group and receiving a partition assignment can take some time. So if you provide a value for this property greater than zero, for the first `n` checks (as maximum), if any timeout happens when consuming messages, you will see an output like this:
 
@@ -76,3 +80,8 @@ type KafkaConfig struct {
 ```
 
 If another type of error happens during the first checks (e.g. a Kafka error), even if you set this property to a value greater than zero, `SkipConsumerTimeouts` is internally set to zero. This also happens as soon as a check completes successfully.
+
+With `ConsumerConfig` and `ProducerConfig` you can provide specific configuration (e.g. security) but the following properties will be ignored (because they are internally set by the Kafka checker):
+- bootstrap.servers
+- group.id
+- auto.offset.reset

@@ -104,13 +104,37 @@ func TestNewKafka(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "return error because BootstrapServers is mandatory",
+			name: "valid configuration",
 			args: args{
 				cfg: KafkaConfig{
 					BootstrapServers: bootStrapServers[0],
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "return error because the additional consumer configuration is invalid",
+			args: args{
+				cfg: KafkaConfig{
+					BootstrapServers: bootStrapServers[0],
+					ConsumerConfig: ConsumerConfig{
+						"enable.partition.eof": "invalidvalue",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "return error because the additional producer configuration is invalid",
+			args: args{
+				cfg: KafkaConfig{
+					BootstrapServers: bootStrapServers[0],
+					ProducerConfig: ProducerConfig{
+						"enable.idempotence": "invalidvalue",
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 
