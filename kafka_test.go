@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	confluentKafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
@@ -127,13 +128,25 @@ func TestNewKafka(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
-	t.Run("set an invalid bootStrapServers string", func(t *testing.T) {
-		bootStrapServers := []string{"invalidbroker"}
-		kafkaCheck, _ := NewKafka(KafkaConfig{
-			BootstrapServers: bootStrapServers[0],
+	t.Run("set an invalid topic to force a producer error", func(t *testing.T) {
+		ctx := context.Background()
+		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
+		c, _ := confluentKafka.NewConsumer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+			"group.id":          buildUniqueConsumerGroupId(),
+			"auto.offset.reset": "latest",
 		})
-		defer kafkaCheck.consumer.Close()
-		defer kafkaCheck.producer.Close()
+		p, _ := confluentKafka.NewProducer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+		})
+		kafkaCheck := &Kafka{
+			config: &KafkaConfig{
+				BootstrapServers: bootStrapServers[0],
+				Topic:            "",
+			},
+			consumer: c,
+			producer: p,
+		}
 
 		_, err := kafkaCheck.Status()
 		assert.Equal(t, "error sending messages", err.Error())
