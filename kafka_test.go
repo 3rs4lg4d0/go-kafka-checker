@@ -128,29 +128,6 @@ func TestNewKafka(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
-	t.Run("set an invalid topic to force a producer error", func(t *testing.T) {
-		ctx := context.Background()
-		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
-		c, _ := confluentKafka.NewConsumer(&confluentKafka.ConfigMap{
-			"bootstrap.servers": bootStrapServers,
-			"group.id":          buildUniqueConsumerGroupId(),
-			"auto.offset.reset": "latest",
-		})
-		p, _ := confluentKafka.NewProducer(&confluentKafka.ConfigMap{
-			"bootstrap.servers": bootStrapServers,
-		})
-		kafkaCheck := &Kafka{
-			config: &KafkaConfig{
-				BootstrapServers: bootStrapServers[0],
-				Topic:            "",
-			},
-			consumer: c,
-			producer: p,
-		}
-
-		_, err := kafkaCheck.Status()
-		assert.Equal(t, "error sending messages", err.Error())
-	})
 	t.Run("run until the system is stable", func(t *testing.T) {
 		ctx := context.Background()
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
@@ -208,5 +185,29 @@ func TestStatus(t *testing.T) {
 			}
 		}
 		assert.True(t, skipped > 0)
+	})
+
+	t.Run("set an invalid topic to force a producer error", func(t *testing.T) {
+		ctx := context.Background()
+		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
+		c, _ := confluentKafka.NewConsumer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+			"group.id":          buildUniqueConsumerGroupId(),
+			"auto.offset.reset": "latest",
+		})
+		p, _ := confluentKafka.NewProducer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+		})
+		kafkaCheck := &Kafka{
+			config: &KafkaConfig{
+				BootstrapServers: bootStrapServers[0],
+				Topic:            "",
+			},
+			consumer: c,
+			producer: p,
+		}
+
+		_, err := kafkaCheck.Status()
+		assert.Equal(t, "error sending messages", err.Error())
 	})
 }
