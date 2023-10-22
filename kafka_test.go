@@ -133,6 +133,7 @@ func TestStatus(t *testing.T) {
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
 			BootstrapServers: bootStrapServers[0],
+			CheckTimeout:     400 * time.Millisecond,
 		})
 		defer kafkaCheck.consumer.Close()
 		defer kafkaCheck.producer.Close()
@@ -163,6 +164,7 @@ func TestStatus(t *testing.T) {
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
 			BootstrapServers:     bootStrapServers[0],
+			CheckTimeout:         400 * time.Millisecond,
 			SkipConsumerTimeouts: iterations,
 		})
 		defer kafkaCheck.consumer.Close()
