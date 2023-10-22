@@ -2,9 +2,11 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +42,45 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(code)
+}
+
+func TestBuildUniqueConsumerGroupId(t *testing.T) {
+	realHostname, _ := os.Hostname()
+
+	type args struct {
+		hnProvider hostnameProvider
+	}
+	testcases := []struct {
+		name         string
+		args         args
+		wantHostname string
+	}{
+		{
+			name: "return the hostname",
+			args: args{
+				hnProvider: os.Hostname,
+			},
+			wantHostname: realHostname,
+		},
+		{
+			name: "return unknownhost is an error happens",
+			args: args{
+				hnProvider: func() (string, error) {
+					return "", errors.New("unexpected error")
+				},
+			},
+			wantHostname: "unknownhost",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			hnProvider = tc.args.hnProvider
+			cg := buildUniqueConsumerGroupId()
+			substrings := strings.Split(cg, "@@")
+			assert.Equal(t, tc.wantHostname, substrings[1])
+		})
+	}
 }
 
 func TestNewKafka(t *testing.T) {

@@ -31,6 +31,13 @@ func (e *checkTimeoutError) Error() string {
 	return e.message
 }
 
+// hostnameProvider is a generic contract to get the hostname. We use the hostname
+// to build the consumer group identifier.
+type hostnameProvider func() (string, error)
+
+// hnProvider is the default hostname provider.
+var hnProvider hostnameProvider = os.Hostname
+
 // KafkaConfig is used for configuring the go-kafka check.
 type KafkaConfig struct {
 	BootstrapServers     string        // coma separated list of kafka brokers
@@ -120,13 +127,13 @@ func validateKafkaConfig(cfg *KafkaConfig) error {
 // same health topic that will be unused on every restart of our application so better to
 // have a periodic process to cleanup consumer groups in the kafka cluster.
 func buildUniqueConsumerGroupId() string {
-	hostname, err := os.Hostname()
+	hostname, err := hnProvider()
 	if err != nil {
-		return "unknownhost"
+		hostname = "unknownhost"
 	}
 
 	timestamp := time.Now().UnixNano()
-	uniqueID := fmt.Sprintf("%s-%s-%d", consumerGroupPrefix, hostname, timestamp)
+	uniqueID := fmt.Sprintf("%s@@%s@@%d", consumerGroupPrefix, hostname, timestamp)
 
 	return uniqueID
 }
