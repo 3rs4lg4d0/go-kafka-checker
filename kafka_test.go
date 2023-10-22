@@ -127,7 +127,18 @@ func TestNewKafka(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
-	t.Run("Run until the system is stable", func(t *testing.T) {
+	t.Run("set an invalid bootStrapServers string", func(t *testing.T) {
+		bootStrapServers := []string{"invalidbroker"}
+		kafkaCheck, _ := NewKafka(KafkaConfig{
+			BootstrapServers: bootStrapServers[0],
+		})
+		defer kafkaCheck.consumer.Close()
+		defer kafkaCheck.producer.Close()
+
+		_, err := kafkaCheck.Status()
+		assert.Equal(t, "error sending messages", err.Error())
+	})
+	t.Run("run until the system is stable", func(t *testing.T) {
 		ctx := context.Background()
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
@@ -154,7 +165,7 @@ func TestStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Check that at least 1 check timeout is skipped", func(t *testing.T) {
+	t.Run("check that at least 1 check timeout is skipped", func(t *testing.T) {
 		ctx := context.Background()
 		iterations := 2
 		skipped := 0
