@@ -7,6 +7,9 @@ on:
       - 'main'
     paths-ignore:
       - "**.md"
+  push:
+    branches:
+      - 'main'
 
 jobs:
   lint:
@@ -59,3 +62,28 @@ jobs:
       env:
         PR_URL: ${{github.event.pull_request.html_url}}
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  release:
+    runs-on: ubuntu-latest
+    name: Semantic release
+    if: ${{ github.event_name == 'push' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Generate goreleaser config
+        run: |
+          echo "builds:" > .goreleaser.yaml
+          echo "  - skip: true" >> .goreleaser.yaml
+      - name: Create release
+        uses: go-semantic-release/action@v1
+        with:
+          hooks: goreleaser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
