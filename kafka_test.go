@@ -2,12 +2,15 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	confluentKafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
@@ -40,6 +43,45 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(code)
+}
+
+func TestBuildUniqueConsumerGroupId(t *testing.T) {
+	realHostname, _ := os.Hostname()
+
+	type args struct {
+		hnProvider hostnameProvider
+	}
+	testcases := []struct {
+		name         string
+		args         args
+		wantHostname string
+	}{
+		{
+			name: "return the hostname",
+			args: args{
+				hnProvider: os.Hostname,
+			},
+			wantHostname: realHostname,
+		},
+		{
+			name: "return unknownhost is an error happens",
+			args: args{
+				hnProvider: func() (string, error) {
+					return "", errors.New("unexpected error")
+				},
+			},
+			wantHostname: "unknownhost",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			hnProvider = tc.args.hnProvider
+			cg := buildUniqueConsumerGroupId()
+			substrings := strings.Split(cg, "@@")
+			assert.Equal(t, tc.wantHostname, substrings[1])
+		})
+	}
 }
 
 func TestNewKafka(t *testing.T) {
@@ -86,7 +128,7 @@ func TestNewKafka(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
-	t.Run("Run until the system is stable", func(t *testing.T) {
+	t.Run("run until the system is stable", func(t *testing.T) {
 		ctx := context.Background()
 		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
 		kafkaCheck, _ := NewKafka(KafkaConfig{
@@ -113,7 +155,7 @@ func TestStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Check that at least 1 check timeout is skipped", func(t *testing.T) {
+	t.Run("check that at least 1 check timeout is skipped", func(t *testing.T) {
 		ctx := context.Background()
 		iterations := 2
 		skipped := 0
@@ -143,5 +185,29 @@ func TestStatus(t *testing.T) {
 			}
 		}
 		assert.True(t, skipped > 0)
+	})
+
+	t.Run("set an invalid topic to force a producer error", func(t *testing.T) {
+		ctx := context.Background()
+		bootStrapServers, _ := kafkaContainer.Brokers(ctx)
+		c, _ := confluentKafka.NewConsumer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+			"group.id":          buildUniqueConsumerGroupId(),
+			"auto.offset.reset": "latest",
+		})
+		p, _ := confluentKafka.NewProducer(&confluentKafka.ConfigMap{
+			"bootstrap.servers": bootStrapServers,
+		})
+		kafkaCheck := &Kafka{
+			config: &KafkaConfig{
+				BootstrapServers: bootStrapServers[0],
+				Topic:            "",
+			},
+			consumer: c,
+			producer: p,
+		}
+
+		_, err := kafkaCheck.Status()
+		assert.Equal(t, "error sending messages", err.Error())
 	})
 }
