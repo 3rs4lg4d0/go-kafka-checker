@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/InVisionApp/go-health/v2 v2.1.4
 	github.com/confluentinc/confluent-kafka-go v1.9.2
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.26.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.26.0
