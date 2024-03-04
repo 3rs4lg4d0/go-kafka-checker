@@ -6,7 +6,7 @@ require (
 	github.com/InVisionApp/go-health/v2 v2.1.4
 	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/google/uuid v1.6.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.28.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.28.0
 )
